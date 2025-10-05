@@ -1,0 +1,5 @@
+[wokwi]
+version = 1
+firmware = '.pio/build/featheresp32/firmware.bin'
+elf = '.pio/build/featheresp32/firmware.elf'
+rfc2217ServerPort = 4000
