@@ -4,6 +4,16 @@
 
 Adafruit_MPU6050 mpu;
 const uint8_t chipSelect = 10;
+const char filename[] = "data.csv";
+File database_file;
+String dataBuffer;
+unsigned long lastMillis = 0;
+
+// Sensor data arrays
+float acceleration[3];
+float gyroscope[3];
+float temperature;
+int i = 0;
 
 void setup() {
 
@@ -11,8 +21,10 @@ void setup() {
   while (!Serial) {
     ;
   }
+  pinMode(chipSelect, OUTPUT);
+  digitalWrite(chipSelect, HIGH); // gives a known state
   Serial.println(F("MPU6050 and SD card demo"));
-  
+  // dataBuffer.reserve(1024);
   // Initialize I2C (Arduino Nano uses A4=SDA, A5=SCL by default)
   Wire.begin();
   Wire.setClock(100000); // Set I2C clock to 100kHz for better compatibility
@@ -31,48 +43,74 @@ void setup() {
       yield();
   }
   Serial.println(F("SD card initialized"));
-  File dataFile = SD.open("wokwi.txt", FILE_WRITE); // Open the file "data.txt" on the SD card for writing
   
-  if (dataFile) {
-    dataFile.println(F("Hello, world!")); // Write data to the file
-    dataFile.close(); // Close the file
-    Serial.println(F("Data written to SD card."));
-  }
-  else {
-    Serial.println(F("Error opening file."));
+  // Write CSV headers
+  bool file_exists = SD.exists(filename);
+  if (file_exists) {
+    Serial.println(F("File already exists"));
+  }else{
+    database_file = SD.open(filename, FILE_WRITE);
+    if (database_file) {
+      database_file.println("timestamp,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,temperature\n");
+      database_file.close();
+      Serial.println(F("CSV headers written to SD card."));
+    }else{
+      Serial.println(F("Error opening file for headers."));
+      while (1);
+    }
   }
 }
 
 void loop() {
   sensors_event_t a, g, temp;
+  unsigned long now = millis();
   mpu.getEvent(&a, &g, &temp);
-  Serial.print(F("Accelerometer "));
-  Serial.print(F("X: "));
-  Serial.print(a.acceleration.x, 1);
-  Serial.print(F(" m/s^2, "));
-  Serial.print(F("Y: "));
-  Serial.print(a.acceleration.y, 1);
-  Serial.print(F(" m/s^2, "));
-  Serial.print(F("Z: "));
-  Serial.print(a.acceleration.z, 1);
-  Serial.println(F(" m/s^2"));
+  acceleration[0] = a.acceleration.x;
+  acceleration[1] = a.acceleration.y;
+  acceleration[2] = a.acceleration.z;
+  gyroscope[0] = g.gyro.x;
+  gyroscope[1] = g.gyro.y;
+  gyroscope[2] = g.gyro.z;
+  temperature = temp.temperature;
 
-  Serial.print(F("Gyroscope "));
-  Serial.print(F("X: "));
-  Serial.print(g.gyro.x, 1);
-  Serial.print(F(" rps, "));
-  Serial.print(F("Y: "));
-  Serial.print(g.gyro.y, 1);
-  Serial.print(F(" rps, "));
-  Serial.print(F("Z: "));
-  Serial.print(g.gyro.z, 1);
-  Serial.println(F(" rps"));
+  // Add data to buffer
+  dataBuffer += String(now) + "," +
+                String(acceleration[0], 2) + "," +
+                String(acceleration[1], 2) + "," +
+                String(acceleration[2], 2) + "," +
+                String(gyroscope[0], 2) + "," +
+                String(gyroscope[1], 2) + "," +
+                String(gyroscope[2], 2) + "," +
+                String(temperature, 2) + "\n";
 
-  Serial.print(F("Temperature: "));
-  Serial.print(temp.temperature);
-  Serial.print(F(" degC"));
-  Serial.println(F(" "));
-
+  // Try to write buffer to file
+  database_file = SD.open(filename, FILE_WRITE);
+  if (database_file) {
+    // Write all buffered data
+    database_file.write(dataBuffer.c_str(), dataBuffer.length());
+    database_file.close();
+    i++;
+    // Clear buffer after successful write
+    dataBuffer.remove(0, dataBuffer.length());
+    Serial.println(F("Buffer written to file and cleared"));
+  }
+  else {
+    Serial.println(F("File not available, data buffered"));
+  }
+  if (i > 3) {
+    
+    database_file = SD.open(filename, FILE_READ);
+    if (database_file) {
+      while (database_file.available()) {
+        Serial.write(database_file.read());
+      }
+      database_file.close();
+    }
+    else {
+      Serial.println(F("Error opening file for reading"));
+    }
+  }
+  
   delay(100);
 }
 
