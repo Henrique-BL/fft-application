@@ -1,139 +1,117 @@
-/* 
-| This is simple way to read the accelarometer, Gyroscope, and temperature sensor data
-| The data are just read on the serial monitor and dispaly on the OLED
-| For the VS Code of this little simulation: https://github.com/Bamamou/MPU6050_ESP32
-*/
-
 #include <Adafruit_MPU6050.h>
-#include <Adafruit_SSD1306.h>
-#include <Adafruit_Sensor.h>
 #include <Wire.h>
-
-// I2C pins for ESP32 (adjust if using different pins)
-#define SDA_PIN 21
-#define SCL_PIN 22
+#include <SD.h>
 
 Adafruit_MPU6050 mpu;
-Adafruit_SSD1306 display = Adafruit_SSD1306(128, 64, &Wire);
+const int chipSelect = 5;  // CS pin for ESP32
+const char filename[] = "/data.csv";
+File database_file;
+String dataBuffer;
+unsigned long lastMillis = 0;
+
+// Sensor data arrays
+float acceleration[3];
+float gyroscope[3];
+float temperature;
+int i = 0;
 
 void setup() {
+  
   Serial.begin(115200);
-  delay(1000); // Give serial time to initialize
+  // Remove blocking serial wait for ESP32 compatibility
+  delay(1000); // Give time for serial to initialize
+  Serial.println(F("MPU6050 and SD card demo"));
+  // dataBuffer.reserve(1024);
   
-  Serial.println("MPU6050 OLED demo");
-  
-  // Initialize I2C with explicit pins
-  Wire.begin(SDA_PIN, SCL_PIN);
+  // Initialize I2C for ESP32
+  Wire.begin();
   Wire.setClock(100000); // Set I2C clock to 100kHz for better compatibility
-  
-  Serial.println("I2C initialized");
-  Serial.println("Scanning for I2C devices...");
-  
-  // I2C scanner to help debug connectivity
-  byte error, address;
-  int nDevices = 0;
-  
-  for(address = 1; address < 127; address++) {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
-    
-    if (error == 0) {
-      Serial.print("I2C device found at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.println(address, HEX);
-      nDevices++;
-    }
-  }
-  
-  if (nDevices == 0) {
-    Serial.println("No I2C devices found. Check wiring!");
-  } else {
-    Serial.print("Found ");
-    Serial.print(nDevices);
-    Serial.println(" I2C device(s)");
-  }
-  
-  Serial.println("Attempting to initialize MPU6050...");
+
+  Serial.println(F("Attempting to initialize MPU6050..."));
   if (!mpu.begin()) {
-    Serial.println("Sensor init failed");
-    Serial.println("Check:");
-    Serial.println("- Wiring connections (SDA to pin 21, SCL to pin 22)");
-    Serial.println("- Power supply (3.3V or 5V depending on module)");
-    Serial.println("- Pull-up resistors on SDA/SCL lines");
+    Serial.println(F("Sensor init failed"));
+    Serial.println(F("Check I2C connections: SDA=D21, SCL=D22"));
     while (1)
       yield();
   }
-  Serial.println("Found a MPU-6050 sensor");
+  Serial.println(F("MPU6050 initialized successfully"));
 
-  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x32
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ; // Don't proceed, loop forever
+  Serial.println(F("Attempting to initialize SD card..."));
+  if (!SD.begin(chipSelect)) {
+    Serial.println(F("SD card initialization failed"));
+    Serial.println(F("Check SPI connections: CS=D5, MOSI=D23, MISO=D19, SCK=D18"));
+    while (1)
+      yield();
   }
-  display.display();
-  delay(500); // Pause for 2 seconds
-  display.setTextSize(1.5);
-  display.setTextColor(WHITE);
-  display.setRotation(0);
+  Serial.println(F("SD card initialized successfully"));
+  
+  // Write CSV headers
+  bool file_exists = SD.exists(filename);
+  if (file_exists) {
+    Serial.println(F("File already exists"));
+  }else{
+    database_file = SD.open(filename, FILE_WRITE);
+    if (database_file) {
+      database_file.println("timestamp,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,temperature\n");
+      database_file.close();
+      Serial.println(F("CSV headers written to SD card."));
+    }else{
+      Serial.println(F("Error opening file for headers."));
+      while (1);
+    }
+  }
 }
 
 void loop() {
   sensors_event_t a, g, temp;
+  unsigned long now = millis();
   mpu.getEvent(&a, &g, &temp);
+  acceleration[0] = a.acceleration.x;
+  acceleration[1] = a.acceleration.y;
+  acceleration[2] = a.acceleration.z;
+  gyroscope[0] = g.gyro.x;
+  gyroscope[1] = g.gyro.y;
+  gyroscope[2] = g.gyro.z;
+  temperature = temp.temperature;
 
-  display.clearDisplay();
-  display.setCursor(0, 0);
+  // Add data to buffer
+  dataBuffer += String(now) + "," +
+                String(acceleration[0], 2) + "," +
+                String(acceleration[1], 2) + "," +
+                String(acceleration[2], 2) + "," +
+                String(gyroscope[0], 2) + "," +
+                String(gyroscope[1], 2) + "," +
+                String(gyroscope[2], 2) + "," +
+                String(temperature, 2) + "\n";
 
-  Serial.print("Accelerometer ");
-  Serial.print("X: ");
-  Serial.print(a.acceleration.x, 1);
-  Serial.print(" m/s^2, ");
-  Serial.print("Y: ");
-  Serial.print(a.acceleration.y, 1);
-  Serial.print(" m/s^2, ");
-  Serial.print("Z: ");
-  Serial.print(a.acceleration.z, 1);
-  Serial.println(" m/s^2");
-
-  display.println("Accelerometer - m/s^2");
-  display.setCursor(0, 10);
-  display.print(a.acceleration.x, 1);
-  display.print(", ");
-  display.print(a.acceleration.y, 1);
-  display.print(", ");
-  display.print(a.acceleration.z, 1);
-  display.println("");
-
-  Serial.print("Gyroscope ");
-  Serial.print("X: ");
-  Serial.print(g.gyro.x, 1);
-  Serial.print(" rps, ");
-  Serial.print("Y: ");
-  Serial.print(g.gyro.y, 1);
-  Serial.print(" rps, ");
-  Serial.print("Z: ");
-  Serial.print(g.gyro.z, 1);
-  Serial.println(" rps");
-
-  Serial.print("Temperature: ");
-  Serial.print(temp.temperature);
-  Serial.print(" degC");
-  Serial.println(" ");
-  display.setCursor(0, 26);
-  display.println("Gyroscope - rps");
-  display.setCursor(0, 38);
-  display.print(g.gyro.x, 1);
-  display.print(", ");
-  display.print(g.gyro.y, 1);
-  display.print(", ");
-  display.print(g.gyro.z, 1);
-  display.println("");
-  display.setCursor(0, 55);
-  display.print("Temp: ");
-  display.print(temp.temperature);
-  display.print(" degC");
-
-  display.display();
+  // Try to write buffer to file
+  database_file = SD.open(filename, FILE_WRITE);
+  if (database_file) {
+    // Write all buffered data
+    database_file.write((const uint8_t*)dataBuffer.c_str(), dataBuffer.length());
+    database_file.close();
+    i++;
+    // Clear buffer after successful write
+    dataBuffer.remove(0, dataBuffer.length());
+    Serial.println(F("Buffer written to file and cleared"));
+  }
+  else {
+    Serial.println(F("File not available, data buffered"));
+  }
+  if (i > 3) {
+    
+    database_file = SD.open(filename, FILE_READ);
+    if (database_file) {
+      while (database_file.available()) {
+        Serial.write(database_file.read());
+      }
+      database_file.close();
+    }
+    else {
+      Serial.println(F("Error opening file for reading"));
+    }
+  }
+  
   delay(100);
 }
+
