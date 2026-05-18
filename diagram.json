@@ -1,32 +1,67 @@
 {
   "version": 1,
-  "author": "Uri Shaked",
+  "author": "fft-application",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 62.3, "left": -197, "attrs": {} },
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "chip-geophone",
+      "id": "geo1",
+      "top": -200,
+      "left": -200,
+      "attrs": { "frequencyHz": "15", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
+    },
+    {
+      "type": "chip-instamp",
+      "id": "amp1",
+      "top": -200,
+      "left": 0,
+      "attrs": { "gain": "100", "vref": "2.5" }
+    },
+    {
+      "type": "chip-ads1256",
+      "id": "ads1",
+      "top": -200,
+      "left": 200,
+      "attrs": { "gain": "1" }
+    },
     {
       "type": "wokwi-microsd-card",
       "id": "sd1",
-      "top": -93.43,
-      "left": -12.53,
-      "rotate": 90,
+      "top": 200,
+      "left": 200,
       "attrs": {}
-    },
-    { "type": "wokwi-mpu6050", "id": "imu1", "top": 253.42, "left": -74.48, "attrs": {} }
+    }
   ],
   "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "sd1:CS", "esp:5", "green", [ "h-0.06", "v192", "h-96.24" ] ],
-    [ "sd1:DI", "esp:23", "green", [ "h0.09", "v38.4", "h-105.84" ] ],
-    [ "sd1:VCC", "esp:5V", "red", [ "h38.4", "v86.54", "h-268.94", "v196.56" ] ],
-    [ "sd1:SCK", "esp:18", "green", [ "v57.6", "h-125.03" ] ],
-    [ "sd1:GND", "esp:GND.2", "black", [ "h67.2", "v67.31" ] ],
-    [ "sd1:DO", "esp:19", "green", [ "h-0.11", "v177.5" ] ],
-    [ "imu1:SDA", "esp:21", "green", [ "v0" ] ],
-    [ "imu1:SCL", "esp:22", "green", [ "v0" ] ],
-    [ "imu1:VCC", "esp:3V3", "red", [ "v0" ] ],
-    [ "imu1:GND", "esp:GND.1", "black", [ "v0" ] ]
-  ],
-  "dependencies": {}
+    [ "geo1:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "geo1:GND", "uno:GND.1", "black", [ "v0" ] ],
+
+    [ "amp1:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "amp1:GND", "uno:GND.1", "black", [ "v0" ] ],
+
+    [ "geo1:OUT_P", "amp1:IN_P", "green", [ "v0" ] ],
+    [ "geo1:OUT_N", "amp1:IN_N", "blue",  [ "v0" ] ],
+
+    [ "amp1:OUT",  "ads1:AIN0", "orange", [ "v0" ] ],
+    [ "amp1:VREF", "ads1:AIN1", "yellow", [ "v0" ] ],
+    [ "amp1:VREF", "ads1:VREFP", "yellow", [ "v0" ] ],
+    [ "uno:GND.1", "ads1:VREFN", "black", [ "v0" ] ],
+
+    [ "ads1:VCC", "uno:5V",  "red",   [ "v0" ] ],
+    [ "ads1:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "ads1:CS", "uno:9", "green", [ "v0" ] ],
+    [ "ads1:SCK", "uno:13", "green", [ "v0" ] ],
+    [ "ads1:DIN", "uno:11", "green", [ "v0" ] ],
+    [ "ads1:DOUT", "uno:12", "green", [ "v0" ] ],
+    [ "ads1:DRDY", "uno:8", "green", [ "v0" ] ],
+    [ "ads1:RESET", "uno:7", "green", [ "v0" ] ],
+
+    [ "sd1:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "sd1:GND", "uno:GND.2", "black", [ "v0" ] ],
+    [ "sd1:CS",  "uno:10", "green", [ "v0" ] ],
+    [ "sd1:DI",  "uno:11", "green", [ "v0" ] ],
+    [ "sd1:DO",  "uno:12", "green", [ "v0" ] ],
+    [ "sd1:SCK", "uno:13", "green", [ "v0" ] ]
+  ]
 }
