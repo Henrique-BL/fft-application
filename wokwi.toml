@@ -1,4 +1,16 @@
 [wokwi]
 version = 1
-firmware = '.pio/build/esp32dev/firmware.bin'
-elf = '.pio/build/esp32dev/firmware.elf'
+firmware = '.pio/build/uno/firmware.hex'
+elf = '.pio/build/uno/firmware.elf'
+
+[[chip]]
+name = 'geophone'
+binary = 'chips/geophone.chip.wasm'
+
+[[chip]]
+name = 'instamp'
+binary = 'chips/instamp.chip.wasm'
+
+[[chip]]
+name = 'ads1256'
+binary = 'chips/ads1256.chip.wasm'
