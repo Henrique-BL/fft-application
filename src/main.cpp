@@ -35,7 +35,7 @@ namespace {
 // SD card and ADS1256 sit on the same hardware SPI bus (D11/D12/D13);
 // their CS pins are kept HIGH whenever the other device is addressed.
 constexpr uint8_t kSdChipSelect  = 10;   // SD  CS -- deselected while ADS1256 talks
-constexpr uint8_t kAdcChipSelect =  9;   // ADS1256 CS -- driven by ads1256WriteRegister / ads1256ReadDifferential01
+constexpr uint8_t kAdcChipSelect =  9;   // ADS1256 CS -- driven by ads1256WriteRegister / ads1256ReadSample
 constexpr uint8_t kAdcDrdyPin    =  8;   // ADS1256 DRDY -- LOW signals a conversion is ready
 constexpr uint8_t kAdcResetPin   =  7;   // ADS1256 RESET -- pulled LOW during initAds1256() to clear state
 
@@ -51,10 +51,17 @@ constexpr float kAdcGain = 1.0f;
 constexpr unsigned long kDrdyTimeoutUs = 50000UL;
 
 // ADS1256 SPI command bytes used during init and per-sample acquisition.
-constexpr uint8_t kCmdRdata = 0x01;   // Triggers conversion and stages 24-bit result
-constexpr uint8_t kCmdWreg  = 0x50;   // WREG opcode; OR with register address
-constexpr uint8_t kCmdReset = 0xFE;   // Software reset; restores register defaults
-constexpr uint8_t kRegAdcon = 0x02;   // ADCON register: holds PGA gain bits
+constexpr uint8_t kCmdRdata  = 0x01;   // Triggers conversion and stages 24-bit result
+constexpr uint8_t kCmdWreg   = 0x50;   // WREG opcode; OR with register address
+constexpr uint8_t kCmdSync   = 0xFC;   // Synchronises the A/D converter (stops free-run)
+constexpr uint8_t kCmdWakeup = 0xFF;   // Exits SYNC; starts a fresh conversion on the new MUX pair
+constexpr uint8_t kCmdReset  = 0xFE;   // Software reset; restores register defaults
+constexpr uint8_t kRegMux    = 0x01;   // MUX register: selects differential input pair
+constexpr uint8_t kRegAdcon  = 0x02;   // ADCON register: holds PGA gain bits
+
+// MUX values for each geophone channel: upper nibble = AINP, lower nibble = AINN.
+//   0x01 => AIN0(+) - AIN1(-), 0x23 => AIN2(+) - AIN3(-), 0x45 => AIN4(+) - AIN5(-)
+constexpr uint8_t kMuxCh[3] = {0x01, 0x23, 0x45};
 
 // SPI runs at 1 MHz, MODE1; the ADS1256 chip model in ads1256.chip.c samples
 // DIN on SCK falling and shifts DOUT on SCK rising to match this mode.
@@ -62,8 +69,8 @@ SPISettings ads1256Spi(1000000, MSBFIRST, SPI_MODE1);
 
 File database_file;
 
-// Tight CSV row buffer kept inside SRAM-friendly bounds for the Uno's 2 KB.
-char rowBuffer[48];
+// Holds one row: timestamp + 3 × (counts + volts); 3×14 chars per channel + separators.
+char rowBuffer[128];
 uint16_t samplesSinceFlush    = 0;
 uint16_t writesSinceReadback  = 0;
 }  // namespace
@@ -94,10 +101,9 @@ static void ads1256WriteRegister(uint8_t reg, uint8_t value) {
   digitalWrite(kAdcChipSelect, HIGH);
 }
 
-// Issues RDATA (0x01) to the ADS1256 and clocks back the 24-bit signed result.
-// The ADS1256 chip model (ads1256.chip.c) stages this value by computing
-// (AIN0 - AIN1) which cancels the instamp VREF bias before encoding.
-static int32_t ads1256ReadDifferential01() {
+// Issues RDATA (0x01) to the ADS1256 and clocks back the 24-bit signed result
+// for whichever differential pair is currently selected in the MUX register.
+static int32_t ads1256ReadSample() {
   digitalWrite(kAdcChipSelect, LOW);
   SPI.beginTransaction(ads1256Spi);
   SPI.transfer(kCmdRdata);
@@ -113,6 +119,25 @@ static int32_t ads1256ReadDifferential01() {
     raw |= (int32_t)0xFF000000;
   }
   return raw;
+}
+
+// Selects the differential input pair for the next conversion by writing the MUX register.
+static void ads1256SetMux(uint8_t mux) {
+  ads1256WriteRegister(kRegMux, mux);
+}
+
+// Issues SYNC followed by WAKEUP so the digital filter starts a fresh conversion
+// on the newly-selected MUX pair.  Without this sequence the next RDATA on real
+// hardware would return a sample whose SINC5 filter state still includes the
+// previous channel's input; the Wokwi chip model samples synchronously and
+// ignores these bytes, so the same firmware works in simulation and on silicon.
+static void ads1256SyncWakeup() {
+  digitalWrite(kAdcChipSelect, LOW);
+  SPI.beginTransaction(ads1256Spi);
+  SPI.transfer(kCmdSync);
+  SPI.transfer(kCmdWakeup);
+  SPI.endTransaction();
+  digitalWrite(kAdcChipSelect, HIGH);
 }
 
 // Configures the ADS1256 for use with the instrumentation amplifier output:
@@ -198,7 +223,7 @@ void setup() {
     if (!database_file) {
       halt(F("Cannot create data.csv"));
     }
-    database_file.println(F("timestamp_us,counts,volts"));
+    database_file.println(F("timestamp_us,ch0_counts,ch0_volts,ch1_counts,ch1_volts,ch2_counts,ch2_volts"));
     database_file.close();
     Serial.println(F("CSV header written"));
   } else {
@@ -209,23 +234,39 @@ void setup() {
 void loop() {
   unsigned long t_us = micros();
 
-  // Waits for the ADS1256 to signal that the differential conversion is complete;
-  // the chip model holds DRDY LOW permanently, so this returns immediately in simulation.
-  if (!waitDrdyLow(kDrdyTimeoutUs)) {
-    Serial.println(F("ADC DRDY timeout"));
-    delay(10);
-    return;
+  int32_t counts[3];
+  float   volts[3];
+
+  // Scans all three geophone channels; per channel:
+  //   1. WREG MUX     -- select the new differential pair
+  //   2. SYNC+WAKEUP  -- flush the SINC5 filter so the next conversion uses only the new pair
+  //   3. wait DRDY    -- block until the fresh conversion has actually completed
+  //   4. RDATA        -- clock out the 24-bit result
+  for (uint8_t ch = 0; ch < 3; ch++) {
+    ads1256SetMux(kMuxCh[ch]);
+    ads1256SyncWakeup();
+    if (!waitDrdyLow(kDrdyTimeoutUs)) {
+      Serial.print(F("ADC DRDY timeout ch"));
+      Serial.println(ch);
+      delay(10);
+      return;
+    }
+    counts[ch] = ads1256ReadSample();
+    volts[ch]  = countsToVolts(counts[ch]);
   }
 
-  // Reads AIN0 - AIN1: the ADC has already subtracted the instamp VREF bias,
-  // returning the true bipolar geophone-equivalent signal in 24-bit signed counts.
-  int32_t counts = ads1256ReadDifferential01();
-  float volts    = countsToVolts(counts);
-
-  // dtostrf avoids pulling in the printf-float library, preserving flash space.
-  char vbuf[12];
-  dtostrf(volts, 0, 5, vbuf);
-  snprintf(rowBuffer, sizeof(rowBuffer), "%lu,%ld,%s", t_us, (long)counts, vbuf);
+  // Formats all three channels into a single CSV row; dtostrf avoids the
+  // printf-float library to stay within the Uno's 32 KB flash budget.
+  char vbuf[3][12];
+  for (uint8_t ch = 0; ch < 3; ch++) {
+    dtostrf(volts[ch], 0, 5, vbuf[ch]);
+  }
+  snprintf(rowBuffer, sizeof(rowBuffer),
+           "%lu,%ld,%s,%ld,%s,%ld,%s",
+           t_us,
+           (long)counts[0], vbuf[0],
+           (long)counts[1], vbuf[1],
+           (long)counts[2], vbuf[2]);
 
   // Opens, writes, and closes the file every sample; this is SD-safe but slow --
   // kFlushEverySamples controls how often a progress message is printed.

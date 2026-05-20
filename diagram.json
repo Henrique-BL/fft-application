@@ -26,6 +26,34 @@
       "attrs": { "gain": "1" }
     },
     {
+      "type": "chip-geophone",
+      "id": "geo2",
+      "top": 0,
+      "left": -200,
+      "attrs": { "frequencyHz": "15", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
+    },
+    {
+      "type": "chip-instamp",
+      "id": "amp2",
+      "top": 0,
+      "left": 0,
+      "attrs": { "gain": "100", "vref": "2.5" }
+    },
+    {
+      "type": "chip-geophone",
+      "id": "geo3",
+      "top": 200,
+      "left": -200,
+      "attrs": { "frequencyHz": "15", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
+    },
+    {
+      "type": "chip-instamp",
+      "id": "amp3",
+      "top": 200,
+      "left": 0,
+      "attrs": { "gain": "100", "vref": "2.5" }
+    },
+    {
       "type": "wokwi-microsd-card",
       "id": "sd1",
       "top": 200,
@@ -47,6 +75,24 @@
     [ "amp1:VREF", "ads1:AIN1", "yellow", [ "v0" ] ],
     [ "amp1:VREF", "ads1:VREFP", "yellow", [ "v0" ] ],
     [ "uno:GND.1", "ads1:VREFN", "black", [ "v0" ] ],
+
+    [ "geo2:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "geo2:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "amp2:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "amp2:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "geo2:OUT_P", "amp2:IN_P", "green", [ "v0" ] ],
+    [ "geo2:OUT_N", "amp2:IN_N", "blue",  [ "v0" ] ],
+    [ "amp2:OUT",  "ads1:AIN2", "orange", [ "v0" ] ],
+    [ "amp2:VREF", "ads1:AIN3", "yellow", [ "v0" ] ],
+
+    [ "geo3:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "geo3:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "amp3:VCC", "uno:5V", "red", [ "v0" ] ],
+    [ "amp3:GND", "uno:GND.1", "black", [ "v0" ] ],
+    [ "geo3:OUT_P", "amp3:IN_P", "green", [ "v0" ] ],
+    [ "geo3:OUT_N", "amp3:IN_N", "blue",  [ "v0" ] ],
+    [ "amp3:OUT",  "ads1:AIN4", "orange", [ "v0" ] ],
+    [ "amp3:VREF", "ads1:AIN5", "yellow", [ "v0" ] ],
 
     [ "ads1:VCC", "uno:5V",  "red",   [ "v0" ] ],
     [ "ads1:GND", "uno:GND.1", "black", [ "v0" ] ],

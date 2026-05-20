@@ -3,10 +3,9 @@
 // Role in the signal chain:
 //   Instrumentation Amplifier (instamp.chip.c) --> ADS1256 (this chip) --> Arduino via SPI
 //
-// AIN0 receives the instrumentation amplifier's OUT pin (amplified + biased signal).
-// AIN1 receives the instrumentation amplifier's VREF pin (the static 2.5 V bias).
-// The differential read (AIN0 - AIN1) cancels the bias in hardware, so the
-// 24-bit result represents only the amplified geophone signal, bipolar around zero.
+// AIN0-AIN7 support eight single-ended or four differential pairs (MUX register).
+// Default MUX=0x01 selects AIN0(+) and AIN1(-); the geophone chain uses that pair
+// for instamp bias cancellation (AIN0 - AIN1).
 //
 // The Arduino firmware (src/main.cpp) drives this chip over SPI:
 //   CS  (pin 9)  -- selects/deselects this chip on the shared SPI bus
@@ -21,9 +20,8 @@
 #include <stdint.h>
 
 typedef struct {
-  // Analog inputs from the instrumentation amplifier.
-  pin_t pin_ain0;    // InstAmp OUT: gain*(Vdiff) + vref
-  pin_t pin_ain1;    // InstAmp VREF: the bias reference to be subtracted
+  // Analog inputs AIN0-AIN7; pair selection comes from the MUX register.
+  pin_t pin_ain[8];
 
   // Reference voltage pins; vref = VREFP - VREFN normalises the ADC full scale.
   pin_t pin_vrefp;
@@ -37,6 +35,8 @@ typedef struct {
   pin_t pin_drdy;    // Signals the Arduino that a conversion result is available
   pin_t pin_reset;   // Hard reset; restores default register values when asserted
 
+  // MUX register (0x01): bits 7-4 = AINP, bits 3-0 = AINN; reset = 0x01 (AIN0-AIN1).
+  uint8_t mux;
   // Mirror of the ADCON register; lower 3 bits set the PGA gain.
   uint8_t adcon;
 
@@ -82,19 +82,28 @@ static float gain_from_adcon(uint8_t adcon) {
   }
 }
 
-// Samples AIN0 and AIN1 from the instrumentation amplifier, applies the PGA gain
-// from ADCON, normalises against the reference voltage, and packs the signed
-// 24-bit result into tx_bytes[] ready to be clocked out on DOUT.
+// Maps a MUX nibble (PSEL or NSEL) to the voltage on that input per the datasheet.
+static float read_ain_from_mux_sel(uint8_t sel) {
+  if (sel & 0x08u) {
+    float vrefp = pin_adc_read(chip.pin_vrefp);
+    float vrefn = pin_adc_read(chip.pin_vrefn);
+    return (vrefp + vrefn) * 0.5f;
+  }
+  return pin_adc_read(chip.pin_ain[sel & 0x07u]);
+}
+
+// Samples the MUX-selected differential pair, applies PGA gain from ADCON,
+// normalises against the reference voltage, and packs the signed 24-bit result.
 static void load_conversion_result(void) {
-  float vp    = pin_adc_read(chip.pin_ain0);   // InstAmp amplified + biased output
-  float vn    = pin_adc_read(chip.pin_ain1);   // InstAmp VREF (bias reference)
+  float vp    = read_ain_from_mux_sel((chip.mux >> 4) & 0x0Fu);
+  float vn    = read_ain_from_mux_sel(chip.mux & 0x0Fu);
   float vrefp = pin_adc_read(chip.pin_vrefp);
   float vrefn = pin_adc_read(chip.pin_vrefn);
   float gain  = gain_from_adcon(chip.adcon);
   float vref  = vrefp - vrefn;
   if (vref < 0.01f) vref = 2.5f;  // Falls back to nominal if reference pins are floating.
 
-  // (vp - vn) subtracts the instamp VREF bias, recovering the true bipolar signal.
+  // (vp - vn) is the differential voltage for the selected MUX pair.
   // Multiplying by gain applies the PGA factor configured by the Arduino firmware.
   // Dividing by vref normalises to the [-1, 1] range that maps to ±full-scale counts.
   float normalized = ((vp - vn) * gain) / vref;
@@ -146,10 +155,9 @@ static void reset_protocol_state(void) {
   pin_mode(chip.pin_dout, INPUT);
 }
 
-// Full hardware reset: restores ADCON to the power-on default (PGA=1, gain=0x20)
-// and clears the protocol state; mirrors what the Arduino firmware does by
-// sending the RESET (0xFE) command or pulling the RESET pin LOW.
+// Full hardware reset: restores MUX/ADCON power-on defaults and clears protocol state.
 static void reset_device_state(void) {
+  chip.mux   = 0x01;  // AIN0 (+), AIN1 (-)
   chip.adcon = 0x20;
   reset_protocol_state();
 }
@@ -169,9 +177,9 @@ static void handle_received_byte(uint8_t data) {
   }
 
   if (chip.expect_wreg_data) {
-    // Subsequent bytes are register data; only ADCON (addr 0x02) is acted on,
-    // as it holds the PGA gain bits that affect the conversion result.
-    if (chip.wreg_addr == 0x02) {
+    if (chip.wreg_addr == 0x01) {
+      chip.mux = data;
+    } else if (chip.wreg_addr == 0x02) {
       chip.adcon = data;
     }
     if (chip.wreg_count > 0) chip.wreg_count--;
@@ -252,9 +260,14 @@ static void pin_change_handler(void *user_data, pin_t pin, uint32_t value) {
 }
 
 void chip_init(void) {
-  // Analog inputs driven by the instrumentation amplifier outputs.
-  chip.pin_ain0  = pin_init("AIN0",  ANALOG);
-  chip.pin_ain1  = pin_init("AIN1",  ANALOG);
+  chip.pin_ain[0] = pin_init("AIN0", ANALOG);
+  chip.pin_ain[1] = pin_init("AIN1", ANALOG);
+  chip.pin_ain[2] = pin_init("AIN2", ANALOG);
+  chip.pin_ain[3] = pin_init("AIN3", ANALOG);
+  chip.pin_ain[4] = pin_init("AIN4", ANALOG);
+  chip.pin_ain[5] = pin_init("AIN5", ANALOG);
+  chip.pin_ain[6] = pin_init("AIN6", ANALOG);
+  chip.pin_ain[7] = pin_init("AIN7", ANALOG);
   chip.pin_vrefp = pin_init("VREFP", ANALOG);
   chip.pin_vrefn = pin_init("VREFN", ANALOG);
 

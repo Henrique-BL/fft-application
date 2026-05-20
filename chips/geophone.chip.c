@@ -58,8 +58,8 @@ void chip_init(void) {
   chip->pin_out_p = pin_init("OUT_P", ANALOG);
   chip->pin_out_n = pin_init("OUT_N", ANALOG);
 
-  chip->attr_freq        = attr_init_float("frequencyHz", 15.0f);
-  chip->attr_amp_mv      = attr_init_float("amplitudeMv", 50.0f);
+  chip->attr_freq        = attr_init_float("frequencyHz", 4.5f);
+  chip->attr_amp_mv      = attr_init_float("amplitudeMv", 29.0f);
   chip->attr_noise_mv    = attr_init_float("noiseMv", 1.0f);
   chip->attr_event_burst = attr_init("eventBurst", 0);
 
