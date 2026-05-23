@@ -1,7 +1,7 @@
 {
   "name": "Geophone",
   "author": "fft-application",
-  "pins": ["OUT_P", "OUT_N", "VCC", "GND"],
+  "pins": ["OUT_P", "OUT_N"],
   "controls": [
     {
       "id": "frequencyHz",

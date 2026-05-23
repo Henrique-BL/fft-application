@@ -50,7 +50,7 @@ void chip_init(void) {
   chip->pin_out   = pin_init("OUT",  ANALOG);
   chip->pin_vref  = pin_init("VREF", ANALOG);
 
-  chip->attr_gain = attr_init_float("gain", 100.0f);
+  chip->attr_gain = attr_init_float("gain", 10.0f);
   chip->attr_vref = attr_init_float("vref", 2.5f);
 
   const timer_config_t timer_config = {
