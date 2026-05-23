@@ -1,10 +1,10 @@
-// Wokwi custom chip that emulates the ADS1256 24-bit delta-sigma ADC.
+// Chip customizado Wokwi que emula o ADC delta-sigma de 24 bits ADS1256.
 //
-// Role in the signal chain:
-//   Instrumentation Amplifier (instamp.chip.c) --> ADS1256 (this chip) --> Arduino via SPI
+// Papel na cadeia de sinal:
+//   Amplificador de instrumentação (instamp.chip.c) --> ADS1256 (este chip) --> Arduino via SPI
 //
-// Implements the SPI/register/DRDY behavior expected by the Curious Scientist ADS1256 library.
-// Each diagram instance allocates its own chip_state_t (required for multi-ADC setups).
+// Implementa o comportamento SPI/registradores/DRDY esperado pela biblioteca ADS1256 do Curious Scientist.
+// Cada instância no diagrama aloca seu próprio chip_state_t (necessário para configurações multi-ADC).
 
 #include "wokwi-api.h"
 #include <stdbool.h>
@@ -38,7 +38,7 @@ typedef struct {
   uint8_t regs[REG_COUNT];
 
   bool rdatas_mode;
-  bool drdy_ready;  // true when DRDY pin is LOW (conversion data available)
+  bool drdy_ready;  // true quando o pino DRDY está em LOW (dados de conversão disponíveis)
 
   uint8_t rx_byte;
   uint8_t rx_bit_count;
