@@ -1,11 +1,11 @@
 {
   "name": "Geophone",
   "author": "fft-application",
-  "pins": ["OUT_P", "OUT_N", "VCC", "GND"],
+  "pins": ["OUT_P", "OUT_N"],
   "controls": [
     {
       "id": "frequencyHz",
-      "label": "Frequency (Hz)",
+      "label": "Frequência (Hz)",
       "type": "range",
       "min": 1,
       "max": 200,
@@ -21,7 +21,7 @@
     },
     {
       "id": "noiseMv",
-      "label": "Noise (mV)",
+      "label": "Ruído (mV)",
       "type": "range",
       "min": 0,
       "max": 50,
@@ -29,7 +29,7 @@
     },
     {
       "id": "eventBurst",
-      "label": "Event Burst (10x amp)",
+      "label": "Rajada de evento (10x amp)",
       "type": "range",
       "min": 0,
       "max": 1,

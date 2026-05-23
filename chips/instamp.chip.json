@@ -5,7 +5,7 @@
   "controls": [
     {
       "id": "gain",
-      "label": "Gain (V/V)",
+      "label": "Ganho (V/V)",
       "type": "range",
       "min": 1,
       "max": 1000,
