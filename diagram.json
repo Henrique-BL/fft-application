@@ -3,54 +3,39 @@
   "author": "fft-application",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-arduino-uno", "id": "uno", "top": 80, "left": 40, "attrs": {} },
-    {
-      "type": "wokwi-breadboard-half",
-      "id": "bb1",
-      "top": -180,
-      "left": -280,
-      "attrs": {}
-    },
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
     {
       "type": "chip-geophone",
       "id": "geo1",
-      "top": -280,
-      "left": -420,
+      "top": -220,
+      "left": -360,
       "attrs": { "frequencyHz": "15", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
     },
     {
       "type": "chip-instamp",
       "id": "amp1",
-      "top": -280,
-      "left": 80,
+      "top": -220,
+      "left": -200,
       "attrs": { "gain": "100", "vref": "2.5" }
     },
     {
       "type": "chip-ads1256",
       "id": "ads1",
-      "top": -280,
-      "left": 240,
+      "top": -220,
+      "left": -40,
       "attrs": {}
     },
     {
       "type": "wokwi-microsd-card",
       "id": "sd1",
-      "top": 280,
-      "left": 280,
+      "top": 200,
+      "left": 200,
       "attrs": {}
     }
   ],
   "connections": [
-    [ "geo1:OUT_P", "bb1:5t.a", "green", [ "v0" ] ],
-    [ "r_p:1", "bb1:5t.c", "", [ "$bb" ] ],
-    [ "r_p:2", "bb1:12t.c", "", [ "$bb" ] ],
-    [ "bb1:12t.a", "amp1:IN_P", "green", [ "v0" ] ],
-
-    [ "geo1:OUT_N", "bb1:5b.f", "blue", [ "v0" ] ],
-    [ "r_n:1", "bb1:5b.h", "", [ "$bb" ] ],
-    [ "r_n:2", "bb1:12b.h", "", [ "$bb" ] ],
-    [ "bb1:12b.f", "amp1:IN_N", "blue", [ "v0" ] ],
-
+    [ "geo1:OUT_P", "amp1:IN_P", "green", [ "v0" ] ],
+    [ "geo1:OUT_N", "amp1:IN_N", "blue", [ "v0" ] ],
     [ "amp1:VCC", "uno:5V", "red", [ "v0" ] ],
     [ "amp1:GND", "uno:GND.1", "black", [ "v0" ] ],
     [ "amp1:OUT", "ads1:AIN0", "orange", [ "v0" ] ],
