@@ -3,81 +3,54 @@
   "author": "fft-application",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 80, "left": 40, "attrs": {} },
+    {
+      "type": "wokwi-breadboard-half",
+      "id": "bb1",
+      "top": -180,
+      "left": -280,
+      "attrs": {}
+    },
     {
       "type": "chip-geophone",
       "id": "geo1",
-      "top": -220,
-      "left": -360,
+      "top": -280,
+      "left": -420,
       "attrs": { "frequencyHz": "15", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
     },
     {
       "type": "chip-instamp",
       "id": "amp1",
-      "top": -220,
-      "left": -200,
+      "top": -280,
+      "left": 80,
       "attrs": { "gain": "100", "vref": "2.5" }
     },
     {
       "type": "chip-ads1256",
       "id": "ads1",
-      "top": -220,
-      "left": -40,
-      "attrs": {}
-    },
-    {
-      "type": "chip-geophone",
-      "id": "geo2",
-      "top": -220,
-      "left": 120,
-      "attrs": { "frequencyHz": "18", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
-    },
-    {
-      "type": "chip-instamp",
-      "id": "amp2",
-      "top": -220,
-      "left": 280,
-      "attrs": { "gain": "100", "vref": "2.5" }
-    },
-    {
-      "type": "chip-ads1256",
-      "id": "ads2",
-      "top": -220,
-      "left": 440,
-      "attrs": {}
-    },
-    {
-      "type": "chip-geophone",
-      "id": "geo3",
-      "top": -220,
-      "left": 600,
-      "attrs": { "frequencyHz": "21", "amplitudeMv": "50", "noiseMv": "1", "eventBurst": "0" }
-    },
-    {
-      "type": "chip-instamp",
-      "id": "amp3",
-      "top": -220,
-      "left": 760,
-      "attrs": { "gain": "100", "vref": "2.5" }
-    },
-    {
-      "type": "chip-ads1256",
-      "id": "ads3",
-      "top": -220,
-      "left": 920,
+      "top": -280,
+      "left": 240,
       "attrs": {}
     },
     {
       "type": "wokwi-microsd-card",
       "id": "sd1",
-      "top": 200,
-      "left": 200,
+      "top": 280,
+      "left": 280,
       "attrs": {}
     }
   ],
   "connections": [
-    [ "geo1:OUT_P", "amp1:IN_P", "green", [ "v0" ] ],
-    [ "geo1:OUT_N", "amp1:IN_N", "blue", [ "v0" ] ],
+    [ "geo1:OUT_P", "bb1:5t.a", "green", [ "v0" ] ],
+    [ "r_p:1", "bb1:5t.c", "", [ "$bb" ] ],
+    [ "r_p:2", "bb1:12t.c", "", [ "$bb" ] ],
+    [ "bb1:12t.a", "amp1:IN_P", "green", [ "v0" ] ],
+
+    [ "geo1:OUT_N", "bb1:5b.f", "blue", [ "v0" ] ],
+    [ "r_n:1", "bb1:5b.h", "", [ "$bb" ] ],
+    [ "r_n:2", "bb1:12b.h", "", [ "$bb" ] ],
+    [ "bb1:12b.f", "amp1:IN_N", "blue", [ "v0" ] ],
+
     [ "amp1:VCC", "uno:5V", "red", [ "v0" ] ],
     [ "amp1:GND", "uno:GND.1", "black", [ "v0" ] ],
     [ "amp1:OUT", "ads1:AIN0", "orange", [ "v0" ] ],
@@ -96,48 +69,6 @@
     [ "ads1:SCK", "uno:13", "green", [ "v0" ] ],
     [ "ads1:DIN", "uno:11", "green", [ "v0" ] ],
     [ "ads1:DOUT", "uno:12", "green", [ "v0" ] ],
-
-    [ "geo2:OUT_P", "amp2:IN_P", "green", [ "v0" ] ],
-    [ "geo2:OUT_N", "amp2:IN_N", "blue", [ "v0" ] ],
-    [ "amp2:VCC", "uno:5V", "red", [ "v0" ] ],
-    [ "amp2:GND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "amp2:OUT", "ads2:AIN0", "orange", [ "v0" ] ],
-    [ "amp2:VREF", "ads2:AIN1", "yellow", [ "v0" ] ],
-    [ "amp2:VREF", "ads2:VREFP", "yellow", [ "v0" ] ],
-    [ "uno:GND.1", "ads2:VREFN", "black", [ "v0" ] ],
-    [ "uno:GND.1", "ads2:AINCOM", "black", [ "v0" ] ],
-    [ "ads2:AVDD", "uno:5V", "red", [ "v0" ] ],
-    [ "ads2:DVDD", "uno:5V", "red", [ "v0" ] ],
-    [ "ads2:AGND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "ads2:DGND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "ads2:SYNC", "uno:5V", "red", [ "v0" ] ],
-    [ "ads2:CS", "uno:6", "green", [ "v0" ] ],
-    [ "ads2:DRDY", "uno:4", "green", [ "v0" ] ],
-    [ "ads2:RESET", "uno:7", "green", [ "v0" ] ],
-    [ "ads2:SCK", "uno:13", "green", [ "v0" ] ],
-    [ "ads2:DIN", "uno:11", "green", [ "v0" ] ],
-    [ "ads2:DOUT", "uno:12", "green", [ "v0" ] ],
-
-    [ "geo3:OUT_P", "amp3:IN_P", "green", [ "v0" ] ],
-    [ "geo3:OUT_N", "amp3:IN_N", "blue", [ "v0" ] ],
-    [ "amp3:VCC", "uno:5V", "red", [ "v0" ] ],
-    [ "amp3:GND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "amp3:OUT", "ads3:AIN0", "orange", [ "v0" ] ],
-    [ "amp3:VREF", "ads3:AIN1", "yellow", [ "v0" ] ],
-    [ "amp3:VREF", "ads3:VREFP", "yellow", [ "v0" ] ],
-    [ "uno:GND.1", "ads3:VREFN", "black", [ "v0" ] ],
-    [ "uno:GND.1", "ads3:AINCOM", "black", [ "v0" ] ],
-    [ "ads3:AVDD", "uno:5V", "red", [ "v0" ] ],
-    [ "ads3:DVDD", "uno:5V", "red", [ "v0" ] ],
-    [ "ads3:AGND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "ads3:DGND", "uno:GND.1", "black", [ "v0" ] ],
-    [ "ads3:SYNC", "uno:5V", "red", [ "v0" ] ],
-    [ "ads3:CS", "uno:5", "green", [ "v0" ] ],
-    [ "ads3:DRDY", "uno:2", "green", [ "v0" ] ],
-    [ "ads3:RESET", "uno:7", "green", [ "v0" ] ],
-    [ "ads3:SCK", "uno:13", "green", [ "v0" ] ],
-    [ "ads3:DIN", "uno:11", "green", [ "v0" ] ],
-    [ "ads3:DOUT", "uno:12", "green", [ "v0" ] ],
 
     [ "sd1:VCC", "uno:5V", "red", [ "v0" ] ],
     [ "sd1:GND", "uno:GND.2", "black", [ "v0" ] ],
