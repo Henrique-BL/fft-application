@@ -148,7 +148,7 @@ static void set_drdy_ready(chip_state_t *chip, bool ready) {
   pin_write(chip->pin_drdy, ready ? LOW : HIGH);
 }
 
-static void schedule_next_conversion(chip_state_t *chip);
+static void schedule_conversions(chip_state_t *chip);
 static void on_tx_complete(chip_state_t *chip);
 static void drdy_after_host_access(chip_state_t *chip);
 static void reset_protocol_state(chip_state_t *chip);
@@ -158,24 +158,19 @@ static void queue_tx_bytes(chip_state_t *chip, const uint8_t *data, uint8_t len)
 static void shift_out_next_bit(chip_state_t *chip);
 static void handle_received_byte(chip_state_t *chip, uint8_t data);
 
-static void drdy_timer_callback(void *user_data) {
-  chip_state_t *chip = (chip_state_t *)user_data;
-  if (!chip->drdy_ready) {
-    if (!chip->data_staged) {
-      load_conversion_result(chip);
-    }
-    set_drdy_ready(chip, true);
-  }
+static void schedule_conversions(chip_state_t *chip) {
+  uint32_t period = drate_period_us(chip->regs[REG_DRATE]);
+  timer_start(chip->drdy_timer, period, true);
 }
 
-static void schedule_next_conversion(chip_state_t *chip) {
-  uint32_t period = drate_period_us(chip->regs[REG_DRATE]);
-  timer_start(chip->drdy_timer, period, false);
+static void drdy_timer_callback(void *user_data) {
+  chip_state_t *chip = (chip_state_t *)user_data;
+  load_conversion_result(chip);
+  set_drdy_ready(chip, true);
 }
 
 static void drdy_after_host_access(chip_state_t *chip) {
   set_drdy_ready(chip, false);
-  schedule_next_conversion(chip);
 }
 
 static void on_tx_complete(chip_state_t *chip) {
@@ -220,6 +215,7 @@ static void reset_device_state(chip_state_t *chip) {
   reset_protocol_state(chip);
   set_drdy_ready(chip, true);
   load_conversion_result(chip);
+  schedule_conversions(chip);
 }
 
 static void queue_tx_bytes(chip_state_t *chip, const uint8_t *data, uint8_t len) {
@@ -272,6 +268,7 @@ static void handle_received_byte(chip_state_t *chip, uint8_t data) {
     if (chip->wreg_count == 0) {
       chip->expect_wreg_data = false;
       drdy_after_host_access(chip);
+      schedule_conversions(chip);
     }
     return;
   }
@@ -301,7 +298,7 @@ static void handle_received_byte(chip_state_t *chip, uint8_t data) {
   if (data == 0xFC) {
     load_conversion_result(chip);
     set_drdy_ready(chip, true);
-    schedule_next_conversion(chip);
+    schedule_conversions(chip);
     return;
   }
 

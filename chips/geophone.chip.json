@@ -29,7 +29,7 @@
     },
     {
       "id": "eventBurst",
-      "label": "Rajada de evento (10x amp)",
+      "label": "Evento (3x, 1 s)",
       "type": "range",
       "min": 0,
       "max": 1,

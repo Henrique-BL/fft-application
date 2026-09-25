@@ -1,11 +1,28 @@
 # fft-application
 
-Firmware e simulação Wokwi para leitura de sinal tipo geofone (diferencial), amplificação de instrumentação e conversão ADS1256, com registro em cartão microSD (CSV).
+Firmware e simulação Wokwi para uma cadeia: geofone → INA128U (`chip-instamp`) → ADS1256, com registro em cartão microSD (CSV).
 
 ## Objetivo
 
-- **Hardware / firmware**: Arduino Uno lê o ADC via SPI, grava amostras em `data.csv` no SD e pode depurar pela serial.
-- **Simulação**: O `diagram.json` monta geofone → amplificador (`chip-instamp`) → ADC (`chip-ads1256`) → cartão SD, espelhando o encadeamento do projeto.
+- **Hardware / firmware**: Arduino Uno lê um ADS1256 via SPI, grava amostras em `data.csv` no SD e pode depurar pela serial.
+- **Simulação**: O `diagram.json` monta um geofone → um INA128U (`chip-instamp`) → um ADS1256 (`chip-ads1256`) → cartão SD.
+
+## Cadeia de sinal e pinos
+
+```
+Geophone (diferencial) → INA128U (gain/VREF) → ADS1256 (AIN0/AIN1) → SPI → Uno
+                                                                  ↘ SD (CS D10)
+```
+
+| Sinal | Pino Uno |
+|-------|----------|
+| ADS1256 CS | D9 |
+| ADS1256 DRDY | D8 |
+| ADS1256 RESET | D7 |
+| SPI MOSI / MISO / SCK | D11 / D12 / D13 |
+| SD CS | D10 |
+
+CSV: `timestamp_us,counts,volts`
 
 ## Estrutura do repositório
 
