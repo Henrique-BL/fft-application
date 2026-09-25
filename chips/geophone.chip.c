@@ -15,7 +15,8 @@
 //   frequencyHz   frequência senoidal em Hz (padrão 15)
 //   amplitudeMv   excursão single-ended em cada perna, em milivolts (padrão 50)
 //   noiseMv       amplitude de ruído branco adicionada igualmente às duas pernas (padrão 1)
-//   eventBurst    valor não nulo multiplica a amplitude por 10 para simular um evento sísmico
+//   eventBurst    valor não nulo aplica ganho extra só numa janela de tempo
+//                 (verifica que o multiplicador não fica ligado o ensaio todo)
 
 #include "wokwi-api.h"
 #include <math.h>
@@ -34,6 +35,13 @@
 // Polarização em meia escala aplicada às duas pernas; deve coincidir com o atributo VREF
 // do instamp para cancelar exatamente o componente em modo comum na entrada do instamp.
 #define V_BIAS 2.5f
+
+// One continuous 3x step on the simulator clock (get_sim_nanos), which
+// includes boot before the first CSV row. On the capture timeline (t = 0
+// at the first sample) the same window shows up a few seconds earlier.
+#define BURST_START_S     8.0
+#define BURST_DURATION_S  1.0
+#define BURST_GAIN        3.0f
 
 typedef struct {
   pin_t pin_out_p;        // Conecta ao IN_P do instamp; transporta V_BIAS + sinal.
@@ -81,12 +89,17 @@ static void chip_timer_event(void *user_data) {
   float freq     = attr_read_float(chip->attr_freq);
   float amp_mv   = attr_read_float(chip->attr_amp_mv);
   float noise_mv = attr_read_float(chip->attr_noise_mv);
-  uint32_t burst = attr_read(chip->attr_event_burst);
+  uint32_t burst_enabled = attr_read(chip->attr_event_burst);
 
-  // Rajada de evento amplia a excursão em ~10x para verificar resposta transitória/FFT
-  // vista pelo instamp e, após amplificação, pelo ADS1256.
-  float burst_gain = burst ? 10.0f : 1.0f;
-  float amp_v   = (amp_mv * burst_gain) / 1000.0f;
+  float burst_gain = 1.0f;
+  if (burst_enabled) {
+    double t_s = get_sim_nanos_d() * 1e-9;
+    if (t_s >= BURST_START_S && t_s < (BURST_START_S + BURST_DURATION_S)) {
+      burst_gain = BURST_GAIN;
+    }
+  }
+
+  float amp_v = (amp_mv * burst_gain) / 1000.0f;
   // Ruído é igual nas duas pernas (modo comum); o instamp rejeita a maior parte
   // ao calcular o diferencial (IN_P - IN_N).
   float noise_v = (noise_mv / 1000.0f) * frand_signed();
